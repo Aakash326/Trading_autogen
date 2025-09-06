@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoGen Trading System - AI-Powered Stock Analysis</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --dark-color: #1f2937;
+            --light-color: #f8fafc;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Market Status */
+        .market-status {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 15px 25px;
+            margin: 20px 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-open { background-color: var(--success-color); }
+        .status-closed { background-color: var(--danger-color); }
+        .status-pre-post { background-color: var(--warning-color); }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .panel h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--dark-color);
+        }
+
+        /* Stock Input Form */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .input-group input:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--light-color);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Popular Stocks */
+        .stock-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .stock-card {
+            background: var(--light-color);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .stock-card:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .stock-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .stock-symbol {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .stock-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Analysis Results */
+        .analysis-container {
+            grid-column: 1 / -1;
+        }
+
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .analysis-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-analyzing {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary-color);
+        }
+
+        .status-completed {
+            background: rgba(5, 150, 105, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-error {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger-color);
+        }
+
+        .analysis-content {
+            background: var(--dark-color);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .analysis-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .analysis-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .analysis-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stock-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+        }
+
+        /* Loading Animation */
+        .loading-dots {
+            display: inline-block;
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 2s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* Recommendation Styling */
+        .recommendation-buy {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+
+        .recommendation-sell {
+            color: var(--danger-color);
+            font-weight: 600;
+        }
+
+        .recommendation-hold {
+            color: var(--warning-color);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> AutoGen Trading System</h1>
+            <p>AI-powered multi-agent stock analysis with real-time recommendations</p>
+            <div class="market-status" id="marketStatus">
+                <div class="status-indicator status-closed"></div>
+                <span>Loading market status...</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Stock Analysis Form -->
+            <div class="panel">
+                <h2><i class="fas fa-search"></i> Stock Analysis</h2>
+                
+                <form id="analysisForm">
+                    <div class="input-group">
+                        <label for="stockSymbol">Stock Symbol</label>
+                        <input type="text" id="stockSymbol" placeholder="e.g. AAPL, GOOGL, TSLA" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="analysisQuestion">Analysis Question</label>
+                        <textarea id="analysisQuestion" rows="3" placeholder="Should I buy stocks of this company?">Should I buy stocks of this company?</textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                        <i class="fas fa-brain"></i>
+                        Start Analysis
+                    </button>
+                    
+                    <button type="button" class="btn btn-secondary" id="clearBtn">
+                        <i class="fas fa-trash"></i>
+                        Clear Results
+                    </button>
+                </form>
+            </div>
+
+            <!-- Popular Stocks -->
+            <div class="panel">
+                <h2><i class="fas fa-star"></i> Popular Stocks</h2>
+                <div class="stock-grid" id="popularStocks">
+                    <!-- Popular stocks will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Results -->
+        <div class="panel analysis-container" id="analysisPanel" style="display: none;">
+            <div class="analysis-header">
+                <h2><i class="fas fa-chart-bar"></i> Analysis Results</h2>
+                <div class="analysis-status" id="analysisStatus">
+                    <div class="spinner"></div>
+                    <span>Initializing analysis<span class="loading-dots"></span></span>
+                </div>
+            </div>
+            <div class="analysis-content" id="analysisContent">
+                Waiting for analysis to begin...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TradingApp {
+            constructor() {
+                this.initializeEventListeners();
+                this.loadMarketStatus();
+                this.loadPopularStocks();
+                this.selectedSymbol = '';
+                this.eventSource = null;
+            }
+
+            initializeEventListeners() {
+                document.getElementById('analysisForm').addEventListener('submit', (e) => this.handleAnalysis(e));
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearResults());
+                
+                // Auto-update market status every minute
+                setInterval(() => this.loadMarketStatus(), 60000);
+            }
+
+            async loadMarketStatus() {
+                try {
+                    const response = await fetch('/market-status');
+                    const data = await response.json();
+                    
+                    const statusElement = document.getElementById('marketStatus');
+                    const indicator = statusElement.querySelector('.status-indicator');
+                    const text = statusElement.querySelector('span');
+                    
+                    // Update indicator color
+                    indicator.className = `status-indicator status-${data.status}`;
+                    
+                    // Update status text
+                    const statusText = {
+                        'open': 'Market Open',
+                        'closed': 'Market Closed',
+                        'pre_post': 'Pre/After Hours'
+                    };
+                    
+                    text.textContent = statusText[data.status] || 'Unknown';
+                } catch (error) {
+                    console.error('Failed to load market status:', error);
+                }
+            }
+
+            async loadPopularStocks() {
+                try {
+                    const response = await fetch('/popular-stocks');
+                    const data = await response.json();
+                    
+                    const container = document.getElementById('popularStocks');
+                    container.innerHTML = '';
+                    
+                    data.stocks.forEach(stock => {
+                        const stockCard = document.createElement('div');
+                        stockCard.className = 'stock-card';
+                        stockCard.innerHTML = `
+                            <div class="stock-symbol">${stock.symbol}</div>
+                            <div class="stock-name">${stock.name.split(' ')[0]}</div>
+                        `;
+                        
+                        stockCard.addEventListener('click', () => this.selectStock(stock.symbol));
+                        container.appendChild(stockCard);
+                    });
+                } catch (error) {
+                    console.error('Failed to load popular stocks:', error);
+                }
+            }
+
+            selectStock(symbol) {
+                // Update selected visual state
+                document.querySelectorAll('.stock-card').forEach(card => card.classList.remove('selected'));
+                event.target.closest('.stock-card').classList.add('selected');
+                
+                // Update input
+                document.getElementById('stockSymbol').value = symbol;
+                this.selectedSymbol = symbol;
+            }
+
+            async handleAnalysis(event) {
+                event.preventDefault();
+                
+                const symbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
+                const question = document.getElementById('analysisQuestion').value.trim();
+                
+                if (!symbol) {
+                    alert('Please enter a stock symbol');
+                    return;
+                }
+
+                this.startStreamingAnalysis(symbol, question);
+            }
+
+            startStreamingAnalysis(symbol, question) {
+                // Show analysis panel
+                const panel = document.getElementById('analysisPanel');
+                const content = document.getElementById('analysisContent');
+                const status = document.getElementById('analysisStatus');
+                
+                panel.style.display = 'block';
+                content.textContent = '';
+                
+                // Update status
+                status.className = 'analysis-status status-analyzing';
+                status.innerHTML = `
+                    <div class="spinner"></div>
+                    <span>Analyzing ${symbol}<span class="loading-dots"></span></span>
+                `;
+
+                // Disable form
+                document.getElementById('analyzeBtn').disabled = true;
+                document.getElementById('analyzeBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+
+                // Close existing connection
+                if (this.eventSource) {
+                    this.eventSource.close();
+                }
+
+                // Start streaming
+                this.eventSource = new EventSource(`/analyze-stream/${symbol}`);
+                
+                this.eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'message') {
+                        content.textContent += data.content + '\n\n';
+                        content.scrollTop = content.scrollHeight;
+                    } else if (data.type === 'complete') {
+                        this.onAnalysisComplete();
+                    } else if (data.type === 'error') {
+                        this.onAnalysisError(data.message);
+                    }
+                };
+
+                this.eventSource.onerror = (error) => {
+                    console.error('EventSource error:', error);
+                    this.onAnalysisError('Connection error occurred');
+                };
+            }
+
+            onAnalysisComplete() {
+                const status = document.getElementById('analysisStatus');
+                status.className = 'analysis-status status-completed';
+                status.innerHTML = `
+                    <i class="fas fa-check-circle"></i>
+                    <span>Analysis Complete</span>
+                `;
+
+                // Re-enable form
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('analyzeBtn').innerHTML = '<i class="fas fa-brain"></i> Start Analysis';
+
+                // Close connection
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+
+                // Apply syntax highlighting to recommendations
+                this.highlightRecommendations();
+            }
+
+            onAnalysisError(message) {
+                const status = document.getElementById('analysisStatus');
+                const content = document.getElementById('analysisContent');
+                
+                status.className = 'analysis-status status-error';
+                status.innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Analysis Failed</span>
+                `;
+
+                content.textContent += `\n\nERROR: ${message}`;
+
+                // Re-enable form
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('analyzeBtn').innerHTML = '<i class="fas fa-brain"></i> Start Analysis';
+
+                // Close connection
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+            }
+
+            highlightRecommendations() {
+                const content = document.getElementById('analysisContent');
+                let html = content.textContent;
+                
+                // Highlight recommendations
+                html = html.replace(/RECOMMENDATION: BUY/g, '<span class="recommendation-buy">RECOMMENDATION: BUY</span>');
+                html = html.replace(/RECOMMENDATION: SELL/g, '<span class="recommendation-sell">RECOMMENDATION: SELL</span>');
+                html = html.replace(/RECOMMENDATION: HOLD/g, '<span class="recommendation-hold">RECOMMENDATION: HOLD</span>');
+                
+                content.innerHTML = html;
+            }
+
+            clearResults() {
+                const panel = document.getElementById('analysisPanel');
+                const content = document.getElementById('analysisContent');
+                
+                panel.style.display = 'none';
+                content.textContent = 'Waiting for analysis to begin...';
+                
+                // Close any active connections
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+
+                // Reset form
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('analyzeBtn').innerHTML = '<i class="fas fa-brain"></i> Start Analysis';
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new TradingApp();
+        });
+    </script>
+</body>
+</html>
