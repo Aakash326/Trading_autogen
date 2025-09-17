@@ -1,18 +1,18 @@
-autogen-agentchat
-autogen-core  
-autogen-ext
-openai
+autogen-agentchat==0.7.4
+autogen-core==0.7.4  
+autogen-ext==0.7.4
+openai==1.65.0
 tiktoken
 python-dotenv
 requests
-fastapi
-uvicorn[standard]
-pydantic
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
 python-multipart
 jinja2
 yfinance
 numpy
 pandas
 scipy
-crewai
+# crewai  # Disabled due to dependency conflicts
 tavily-python

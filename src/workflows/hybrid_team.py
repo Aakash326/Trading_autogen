@@ -9,19 +9,28 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
 import traceback
+import os
+import sys
+
+# Add project root to Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, project_root)
+print(f"Added to path: {project_root}")
 
 # AutoGen imports
 from autogen_agentchat.teams import RoundRobinGroupChat
-from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
+from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.messages import TextMessage
 
-# CrewAI imports (will be imported dynamically to handle missing dependencies)
+# CrewAI imports - Required for 13-agent workflow
 try:
     from crewai import Crew, Process
     CREWAI_AVAILABLE = True
+    print("✅ CrewAI framework loaded successfully")
 except ImportError:
     CREWAI_AVAILABLE = False
-    print("⚠️ CrewAI not available. CrewAI agents will be simulated.")
+    print("❌ CrewAI framework not found! Install with: pip install crewai")
+    raise ImportError("CrewAI is required for 13-agent workflow. No simulation fallback available.")
 
 # Local imports - existing AutoGen agents
 from src.agents.research_agent import create_organiser_agent
@@ -83,22 +92,14 @@ class HybridTradingTeam:
             }
             print(f"✅ AutoGen agents initialized: {len(self.autogen_agents)}")
             
-            # Initialize CrewAI crews (3 crews) - conditional
-            if CREWAI_AVAILABLE:
-                print("🔧 CrewAI available - initializing structured workflow agents...")
-                self.crewai_crews = {
-                    'stress_test': None,  # Will be created per symbol
-                    'arbitrage': None,    # Will be created per symbol  
-                    'order_execution': None  # Will be created per symbol
-                }
-                print("✅ CrewAI crews ready for initialization")
-            else:
-                print("⚠️ CrewAI not available - using simulated workflow agents")
-                self.crewai_crews = {
-                    'stress_test': 'simulated',
-                    'arbitrage': 'simulated',
-                    'order_execution': 'simulated'
-                }
+            # Initialize CrewAI crews (3 crews) - Required for 13-agent workflow
+            print("🔧 Initializing CrewAI structured workflow agents...")
+            self.crewai_crews = {
+                'stress_test': None,  # Will be created per symbol
+                'arbitrage': None,    # Will be created per symbol  
+                'order_execution': None  # Will be created per symbol
+            }
+            print("✅ CrewAI crews ready for initialization")
             
             self.workflow_state = "agents_initialized"
             print("🎯 Hybrid Trading Team ready for analysis")
@@ -108,7 +109,7 @@ class HybridTradingTeam:
             print(traceback.format_exc())
             raise
     
-    async def run_comprehensive_analysis(self, symbol: str, user_question: str = None) -> Dict[str, Any]:
+    async def run_comprehensive_analysis(self, symbol: str, user_question: Optional[str] = None) -> Dict[str, Any]:
         """
         Run comprehensive 13-agent analysis with hybrid framework coordination
         
@@ -184,7 +185,7 @@ class HybridTradingTeam:
             
             print(f"\n🎉 Analysis Complete! Duration: {analysis_duration:.1f}s")
             print(f"🤖 Total Agents: {len(self.autogen_agents) + len(self.crewai_crews)}")
-            print(f"📈 Framework: AutoGen + {'CrewAI' if CREWAI_AVAILABLE else 'Simulated CrewAI'}")
+            print(f"📈 Framework: AutoGen + CrewAI")
             
             return comprehensive_results
             
@@ -208,11 +209,10 @@ class HybridTradingTeam:
         ]
         
         # Create AutoGen team for foundation data
-        termination = TextMentionTermination("FOUNDATION_COMPLETE") | MaxMessageTermination(8)
-        
         foundation_team = RoundRobinGroupChat(
             participants=foundation_agents,
-            termination_condition=termination
+            termination_condition=TextMentionTermination("FOUNDATION_COMPLETE"),
+            max_turns=15  # Allow proper AI discussions
         )
         
         initial_message = TextMessage(
@@ -228,15 +228,26 @@ class HybridTradingTeam:
         )
         
         try:
-            result = await foundation_team.run(initial_message)
+            print("🤖 AutoGen foundation team starting analysis...")
+            result_stream = foundation_team.run_stream(task=initial_message)
+            
+            # Collect messages from stream
+            messages = []
+            async for message in result_stream:
+                if hasattr(message, 'content'):
+                    print(f"📝 AutoGen: {str(message.content)[:100]}...")
+                    messages.append(message)
+                else:
+                    print(f"📝 AutoGen: {str(message)[:100]}...")
+                    messages.append(str(message))
             
             return {
                 'status': 'completed',
                 'participants': ['organiser', 'data_analyst', 'quantitative_analyst'],
                 'framework': 'AutoGen',
                 'execution_pattern': 'Sequential',
-                'messages': [str(msg.content) for msg in result.messages],
-                'summary': 'Foundation data collection completed successfully'
+                'messages': [str(msg.content) if hasattr(msg, 'content') else str(msg) for msg in messages],
+                'summary': f'Foundation data collection completed with {len(messages)} messages'
             }
             
         except Exception as e:
@@ -273,11 +284,10 @@ class HybridTradingTeam:
             self.autogen_agents['esg_analyst']
         ]
         
-        termination = TextMentionTermination("INTELLIGENCE_COMPLETE") | MaxMessageTermination(12)
-        
         intelligence_team = RoundRobinGroupChat(
             participants=intelligence_agents,
-            termination_condition=termination
+            termination_condition=TextMentionTermination("INTELLIGENCE_COMPLETE"),
+            max_turns=25  # Allow proper AI discussions
         )
         
         message = TextMessage(
@@ -293,15 +303,26 @@ class HybridTradingTeam:
         )
         
         try:
-            result = await intelligence_team.run(message)
+            print("🤖 AutoGen intelligence team starting analysis...")
+            result_stream = intelligence_team.run_stream(task=message)
+            
+            # Collect messages from stream
+            messages = []
+            async for msg in result_stream:
+                if hasattr(msg, 'content'):
+                    print(f"🧠 AutoGen: {str(msg.content)[:100]}...")
+                    messages.append(msg)
+                else:
+                    print(f"🧠 AutoGen: {str(msg)[:100]}...")
+                    messages.append(str(msg))
             
             return {
                 'status': 'completed',
                 'participants': ['sentiment_analyst', 'options_analyst', 'esg_analyst'],
                 'framework': 'AutoGen',
                 'execution_pattern': 'Group Discussion',
-                'messages': [str(msg.content) for msg in result.messages],
-                'summary': 'Advanced intelligence analysis completed'
+                'messages': [str(msg.content) if hasattr(msg, 'content') else str(msg) for msg in messages],
+                'summary': f'Advanced intelligence analysis completed with {len(messages)} messages'
             }
             
         except Exception as e:
@@ -309,15 +330,6 @@ class HybridTradingTeam:
     
     async def _run_crewai_intelligence(self, symbol: str) -> Dict[str, Any]:
         """Run CrewAI intelligence workflows: Stress Testing, Arbitrage"""
-        
-        if not CREWAI_AVAILABLE:
-            return {
-                'status': 'simulated',
-                'stress_test': 'Simulated stress test analysis for portfolio risk assessment',
-                'arbitrage': 'Simulated arbitrage analysis for market inefficiency detection',
-                'framework': 'CrewAI (Simulated)',
-                'note': 'CrewAI not available - install with: pip install crewai'
-            }
         
         try:
             # Run stress test and arbitrage analysis in parallel
@@ -338,10 +350,9 @@ class HybridTradingTeam:
             
         except Exception as e:
             return {
-                'status': 'error', 
-                'error': str(e), 
-                'framework': 'CrewAI',
-                'fallback': 'Using simulated CrewAI analysis'
+                'status': 'error',
+                'error': str(e),
+                'framework': 'CrewAI'
             }
     
     async def _phase_3_strategic_analysis(self, symbol: str, foundation_data: Dict) -> Dict[str, Any]:
@@ -354,11 +365,10 @@ class HybridTradingTeam:
             self.autogen_agents['compliance_officer']
         ]
         
-        termination = TextMentionTermination("STRATEGIC_COMPLETE") | MaxMessageTermination(10)
-        
         strategic_team = RoundRobinGroupChat(
             participants=strategic_agents,
-            termination_condition=termination
+            termination_condition=TextMentionTermination("STRATEGIC_COMPLETE"),
+            max_turns=25  # Allow proper AI discussions
         )
         
         message = TextMessage(
@@ -374,14 +384,25 @@ class HybridTradingTeam:
         )
         
         try:
-            result = await strategic_team.run(message)
+            print("🤖 AutoGen strategic team starting analysis...")
+            result_stream = strategic_team.run_stream(task=message)
+            
+            # Collect messages from stream
+            messages = []
+            async for msg in result_stream:
+                if hasattr(msg, 'content'):
+                    print(f"⚔️ AutoGen: {str(msg.content)[:100]}...")
+                    messages.append(msg)
+                else:
+                    print(f"⚔️ AutoGen: {str(msg)[:100]}...")
+                    messages.append(str(msg))
             
             return {
                 'status': 'completed',
                 'participants': ['strategy_developer', 'risk_manager', 'compliance_officer'],
                 'framework': 'AutoGen',
                 'execution_pattern': 'Sequential Analysis',
-                'messages': [str(msg.content) for msg in result.messages],
+                'messages': [str(msg.content) if hasattr(msg, 'content') else str(msg) for msg in messages],
                 'foundation_integration': 'success'
             }
             
@@ -390,13 +411,6 @@ class HybridTradingTeam:
     
     async def _phase_4_execution_optimization(self, symbol: str, strategic_data: Dict) -> Dict[str, Any]:
         """Phase 4: Execution Strategy Optimization (CrewAI Sequential)"""
-        
-        if not CREWAI_AVAILABLE:
-            return {
-                'status': 'simulated',
-                'analysis': f'Simulated execution optimization for {symbol} including market impact analysis, algorithmic trading strategy selection, and smart order routing recommendations',
-                'framework': 'CrewAI (Simulated)'
-            }
         
         try:
             # Create execution optimization crew
@@ -427,11 +441,10 @@ class HybridTradingTeam:
             return {
                 'status': 'error',
                 'error': str(e),
-                'framework': 'CrewAI',
-                'fallback': 'Simulated execution analysis'
+                'framework': 'CrewAI'
             }
     
-    async def _phase_5_final_synthesis(self, symbol: str, user_question: str, 
+    async def _phase_5_final_synthesis(self, symbol: str, user_question: Optional[str], 
                                      foundation: Dict, intelligence: Dict, 
                                      strategic: Dict, execution: Dict) -> Dict[str, Any]:
         """Phase 5: Final Investment Committee Decision (AutoGen Integration)"""
@@ -443,11 +456,10 @@ class HybridTradingTeam:
             self.autogen_agents['compliance_officer']
         ]
         
-        termination = TextMentionTermination("FINAL_DECISION_COMPLETE") | MaxMessageTermination(6)
-        
         synthesis_team = RoundRobinGroupChat(
             participants=synthesis_agents,
-            termination_condition=termination
+            termination_condition=TextMentionTermination("FINAL_DECISION_COMPLETE"),
+            max_turns=20  # Allow proper AI discussions
         )
         
         # Prepare comprehensive context
@@ -457,7 +469,7 @@ class HybridTradingTeam:
         Phase 1 (Foundation): {foundation.get('summary', 'Data collected')}
         Phase 2 (Intelligence): AutoGen + CrewAI parallel analysis completed
         Phase 3 (Strategic): Strategy, risk, and compliance analysis completed  
-        Phase 4 (Execution): Execution optimization {'completed' if execution.get('status') == 'completed' else 'simulated'}
+        Phase 4 (Execution): Execution optimization {execution.get('status', 'unknown')}
         
         User Question: {user_question or 'General investment analysis'}
         
@@ -477,15 +489,26 @@ class HybridTradingTeam:
         )
         
         try:
-            result = await synthesis_team.run(message)
+            print("🤖 AutoGen synthesis team starting final analysis...")
+            result_stream = synthesis_team.run_stream(task=message)
+            
+            # Collect messages from stream
+            messages = []
+            async for msg in result_stream:
+                if hasattr(msg, 'content'):
+                    print(f"📋 AutoGen: {str(msg.content)[:100]}...")
+                    messages.append(msg)
+                else:
+                    print(f"📋 AutoGen: {str(msg)[:100]}...")
+                    messages.append(str(msg))
             
             return {
                 'status': 'completed',
                 'participants': ['report_agent', 'risk_manager', 'compliance_officer'],
                 'framework': 'AutoGen',
                 'execution_pattern': 'Investment Committee',
-                'messages': [str(msg.content) for msg in result.messages],
-                'final_recommendation': self._extract_recommendation(result.messages),
+                'messages': [str(msg.content) if hasattr(msg, 'content') else str(msg) for msg in messages],
+                'final_recommendation': self._extract_recommendation(messages),
                 'synthesis_complete': True
             }
             
@@ -496,7 +519,13 @@ class HybridTradingTeam:
         """Extract final investment recommendation from messages"""
         try:
             # Look for BUY/SELL/HOLD in the last few messages
-            last_messages = [str(msg.content) for msg in messages[-3:]]
+            last_messages = []
+            for msg in messages[-3:]:
+                if hasattr(msg, 'content'):
+                    last_messages.append(str(msg.content))
+                else:
+                    last_messages.append(str(msg))
+            
             full_text = " ".join(last_messages)
             
             if "BUY" in full_text.upper():
@@ -522,15 +551,15 @@ class HybridTradingTeam:
             'crewai_agents': {
                 'count': len(self.crewai_crews),
                 'crews': list(self.crewai_crews.keys()),
-                'status': 'available' if CREWAI_AVAILABLE else 'simulated',
+                'status': 'available',
                 'framework_available': CREWAI_AVAILABLE
             },
             'total_agents': len(self.autogen_agents) + len(self.crewai_crews),
-            'frameworks': ['AutoGen', 'CrewAI' if CREWAI_AVAILABLE else 'CrewAI (Simulated)']
+            'frameworks': ['AutoGen', 'CrewAI']
         }
 
 # Convenience function for easy integration
-async def run_hybrid_analysis(symbol: str, user_question: str = None) -> Dict[str, Any]:
+async def run_hybrid_analysis(symbol: str, user_question: Optional[str] = None) -> Dict[str, Any]:
     """
     Convenience function to run complete 13-agent hybrid analysis
     
