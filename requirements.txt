@@ -10,3 +10,9 @@ uvicorn[standard]
 pydantic
 python-multipart
 jinja2
+yfinance
+numpy
+pandas
+scipy
+crewai
+tavily-python

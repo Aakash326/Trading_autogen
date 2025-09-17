@@ -1,1 +1,1 @@
-MODEL = "gpt-5-mini"
+MODEL = "gpt-4o-mini"

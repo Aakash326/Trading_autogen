@@ -167,6 +167,9 @@ cython_debug/
 .autogen_cache/
 autogen_cache/
 
+# Archive folder (contains old/unused files) - completely ignored
+archive/
+
 # API Keys and sensitive data
 *.key
 *.pem
@@ -174,6 +177,24 @@ autogen_cache/
 *.pfx
 secrets.txt
 api_keys.txt
+
+# Trading analysis output files
+analysis_results_*.json
+*_analysis_output.json
+trading_report_*.pdf
+trading_analysis_*.txt
+stock_reports/
+analysis_cache/
+
+# Test and demo files (development only)
+test_*.py
+demo_*.py
+*_test.py
+*_demo.py
+
+# Cleanup and maintenance scripts output
+cleanup_*.log
+system_check_*.txt
 
 # Database files
 *.db
@@ -241,6 +262,20 @@ cached_models/
 trading_data/
 historical_data/
 market_data.json
+stock_data_cache/
+
+# Documentation files (generated/temporary)
+*_ARCHITECTURE.md
+*_EXPLAINED.md
+*_STRUCTURE.md
+WORKFLOW_*.md
+FINAL_*.md
+CLEAN_*.md
+UPDATED_*.md
+
+# Temporary workflow files
+integrated_analysis.py
+interactive_workflow.py
 
 # Configuration backups
 config.backup
