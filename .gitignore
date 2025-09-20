@@ -291,3 +291,80 @@ config.backup
 *.cer
 *.key
 *.pem
+
+# Frontend specific files
+trading-platform/frontend/node_modules/
+trading-platform/frontend/.next/
+trading-platform/frontend/out/
+trading-platform/frontend/build/
+trading-platform/frontend/dist/
+trading-platform/frontend/.env
+trading-platform/frontend/.env.local
+trading-platform/frontend/.env.development.local
+trading-platform/frontend/.env.test.local
+trading-platform/frontend/.env.production.local
+trading-platform/frontend/npm-debug.log*
+trading-platform/frontend/yarn-debug.log*
+trading-platform/frontend/yarn-error.log*
+trading-platform/frontend/.pnpm-debug.log*
+trading-platform/frontend/.vercel
+trading-platform/frontend/.turbo
+
+# Ensure index.html is NOT ignored (required for Vite)
+!trading-platform/frontend/index.html
+
+# Backend specific files
+trading-platform/backend/.env
+trading-platform/backend/venv/
+trading-platform/backend/env/
+trading-platform/backend/__pycache__/
+trading-platform/backend/*.pyc
+trading-platform/backend/analysis_results/
+trading-platform/backend/logs/
+trading-platform/backend/*.log
+
+# Project specific files
+*.ipynb
+REAL_AI_IMPLEMENTATION_COMPLETE.md
+presentation.html
+AI_Trading_Platform_Presentation.pdf
+documentation.txt
+
+# Development and testing files
+application_hybrid.py
+cleanup_system.py
+run_enhanced_13agent.py
+run_simple_7agent.py
+sugarcan.ipynb
+
+# Auto-generated workflow files
+src/workflows/fast_6agent_workflow.py
+src/workflows/optimized_6agent_workflow.py
+src/workflows/working_6agent_workflow.py
+
+# React app build files
+src/App.jsx
+
+# Playwright specific
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# AI model downloads and cache
+.cache/
+model_downloads/
+huggingface_cache/
+transformers_cache/
+
+# Browser automation
+browser_downloads/
+screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Memory dumps
+*.dmp
+*.core

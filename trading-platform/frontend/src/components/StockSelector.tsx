@@ -8,16 +8,49 @@ import { Stock } from '../types'
 import { useStore } from '../store/useStore'
 
 const POPULAR_STOCKS = [
+  // Tech Giants
   { symbol: 'AAPL', name: 'Apple Inc.' },
   { symbol: 'MSFT', name: 'Microsoft Corporation' },
   { symbol: 'GOOGL', name: 'Alphabet Inc.' },
   { symbol: 'AMZN', name: 'Amazon.com Inc.' },
-  { symbol: 'TSLA', name: 'Tesla, Inc.' },
   { symbol: 'META', name: 'Meta Platforms Inc.' },
   { symbol: 'NVDA', name: 'NVIDIA Corporation' },
+  { symbol: 'TSLA', name: 'Tesla, Inc.' },
   { symbol: 'NFLX', name: 'Netflix Inc.' },
+  
+  // Financial Services
+  { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
+  { symbol: 'BAC', name: 'Bank of America Corp.' },
+  { symbol: 'WFC', name: 'Wells Fargo & Company' },
+  { symbol: 'GS', name: 'Goldman Sachs Group Inc.' },
+  { symbol: 'V', name: 'Visa Inc.' },
+  { symbol: 'MA', name: 'Mastercard Inc.' },
+  
+  // Healthcare & Pharma
+  { symbol: 'JNJ', name: 'Johnson & Johnson' },
+  { symbol: 'PFE', name: 'Pfizer Inc.' },
+  { symbol: 'UNH', name: 'UnitedHealth Group Inc.' },
+  { symbol: 'ABBV', name: 'AbbVie Inc.' },
+  
+  // Consumer & Retail
+  { symbol: 'WMT', name: 'Walmart Inc.' },
+  { symbol: 'PG', name: 'Procter & Gamble Co.' },
+  { symbol: 'KO', name: 'Coca-Cola Company' },
+  { symbol: 'PEP', name: 'PepsiCo Inc.' },
+  { symbol: 'HD', name: 'Home Depot Inc.' },
+  
+  // Transportation & Services
   { symbol: 'UBER', name: 'Uber Technologies Inc.' },
-  { symbol: 'SPOT', name: 'Spotify Technology S.A.' }
+  { symbol: 'LYFT', name: 'Lyft Inc.' },
+  { symbol: 'SPOT', name: 'Spotify Technology S.A.' },
+  
+  // Energy & Utilities
+  { symbol: 'XOM', name: 'Exxon Mobil Corporation' },
+  { symbol: 'CVX', name: 'Chevron Corporation' },
+  
+  // Aerospace & Defense
+  { symbol: 'BA', name: 'Boeing Company' },
+  { symbol: 'LMT', name: 'Lockheed Martin Corp.' }
 ]
 
 export const StockSelector: React.FC = () => {

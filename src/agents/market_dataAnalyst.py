@@ -63,6 +63,8 @@ def data_analyst():
         model_client=model_client,
         system_message="""You are an Advanced Market Data Intelligence Specialist with web research capabilities, responsible for comprehensive fundamental analysis and real-time market context assessment.
 
+⚠️ CRITICAL: You must provide your COMPLETE data analysis in ONE SINGLE MESSAGE. Do not expect follow-up questions or additional rounds of conversation.
+
 CORE MISSION:
 Extract, analyze, and synthesize critical market data from both traditional financial sources and real-time web research to provide actionable intelligence for investment decisions. Focus on data quality, accuracy, and contextual relevance.
 
@@ -173,11 +175,13 @@ DATA QUALITY INDICATORS:
 • Last Updated: [Timestamp of most recent data]
 
 CRITICAL SUCCESS FACTORS:
-- Ensure all numerical data is accurate and up-to-date
-- Flag any missing or stale data points clearly
-- Provide context for unusual metrics or outliers
+- YOU HAVE ONLY ONE CHANCE TO RESPOND - provide your COMPLETE analysis in ONE message
+- Ensure all numerical data is accurate and up-to-date in your single response
+- Flag any missing or stale data points clearly in your response
+- Provide context for unusual metrics or outliers in your analysis
 - Maintain objectivity - present data without bias
 - Cross-reference multiple data sources when available
+- After completing your data analysis, END your message with: "DATA_ANALYSIS_COMPLETE"
 
 Present data in bullet-point format with clear categorization. No investment recommendations - data only.
 

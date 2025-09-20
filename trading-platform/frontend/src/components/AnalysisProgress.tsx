@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckIcon, ExclamationTriangleIcon, StopIcon } from '@heroicons/react/24/outline'
+import { CheckIcon, ExclamationTriangleIcon, StopIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import { Card, CardContent, CardHeader } from './ui/Card'
 import { Button } from './ui/Button'
 import { AnalysisPhase } from '../types'
@@ -32,6 +32,7 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
   phases,
   isRunning
 }) => {
+  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
   const { 
     selectedStock, 
     selectedAnalysisType, 
@@ -42,6 +43,16 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
     setAnalysisRunning,
     setCurrentAnalysis
   } = useStore()
+
+  const togglePhaseExpansion = (phaseId: string) => {
+    const newExpanded = new Set(expandedPhases)
+    if (newExpanded.has(phaseId)) {
+      newExpanded.delete(phaseId)
+    } else {
+      newExpanded.add(phaseId)
+    }
+    setExpandedPhases(newExpanded)
+  }
 
   const handleStopAnalysis = async () => {
     if (!currentAnalysis?.id || isCancelling) return
@@ -94,7 +105,13 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
   }
 
   const completedPhases = phases.filter(p => p.status === 'completed').length
-  const totalPhases = phases.length > 0 ? phases.length : (selectedWorkflow === '13-agent' ? 13 : 7)
+  
+  // Use expected total phases based on workflow type, not actual phases.length
+  const expectedTotalPhases = selectedWorkflow === '13-agent' ? 16 : 
+                              selectedWorkflow === '6-agent' ? 9 : 10
+  
+  // For progress calculation, use the expected total or actual phases if more than expected
+  const totalPhases = Math.max(expectedTotalPhases, phases.length)
   const progressPercentage = totalPhases > 0 ? (completedPhases / totalPhases) * 100 : 0
 
   return (
@@ -181,11 +198,37 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
                       {phase.phase}
                     </p>
                     {phase.content && (
-                      <div className="mt-2 p-2 bg-white rounded border text-sm text-gray-700">
-                        {phase.content.length > 200
-                          ? `${phase.content.substring(0, 200)}...`
-                          : phase.content
-                        }
+                      <div className="mt-2">
+                        <div className="p-2 bg-white rounded border text-sm text-gray-700">
+                          {phase.content.length > 200 ? (
+                            <div>
+                              <div>
+                                {expandedPhases.has(`${phase.phase}-${index}`) 
+                                  ? phase.content 
+                                  : `${phase.content.substring(0, 200)}...`
+                                }
+                              </div>
+                              <button
+                                onClick={() => togglePhaseExpansion(`${phase.phase}-${index}`)}
+                                className="mt-2 flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium"
+                              >
+                                {expandedPhases.has(`${phase.phase}-${index}`) ? (
+                                  <>
+                                    <ChevronUpIcon className="h-3 w-3 mr-1" />
+                                    Show less
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDownIcon className="h-3 w-3 mr-1" />
+                                    Show more
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            phase.content
+                          )}
+                        </div>
                       </div>
                     )}
                     {phase.timestamp && (

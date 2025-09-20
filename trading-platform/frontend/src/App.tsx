@@ -34,6 +34,7 @@ const App: React.FC = () => {
   const { isConnected } = useWebSocket()
 
   const workflowOptions = [
+    { value: '6-agent', label: '6-Agent Workflow (Best) - Recommended', description: 'Optimized performance with essential agents' },
     { value: '7-agent', label: '7-Agent Workflow', description: 'Faster analysis with core agents' },
     { value: '13-agent', label: '13-Agent Workflow', description: 'Comprehensive analysis with all agents' }
   ]
@@ -225,7 +226,7 @@ const App: React.FC = () => {
                     <Select
                       options={workflowOptions}
                       value={selectedWorkflow}
-                      onChange={(value) => setSelectedWorkflow(value as '7-agent' | '13-agent')}
+                      onChange={(value) => setSelectedWorkflow(value as '6-agent' | '7-agent' | '13-agent')}
                       className="max-w-md"
                     />
                   </div>
@@ -280,7 +281,18 @@ const App: React.FC = () => {
                 isRunning={isAnalysisRunning}
               />
               
-              {currentAnalysis.status === 'completed' && (
+              {currentAnalysis.status === 'completed' && 
+               (() => {
+                 // Check if we have completed phases from actual agents (not just system phases)
+                 const agentPhases = currentAnalysis.phases.filter(p => 
+                   p.status === 'completed' && 
+                   p.agent !== 'System' && 
+                   p.agent !== '7-Agent Team' && 
+                   p.agent !== '13-Agent Team'
+                 );
+                 const expectedAgents = selectedWorkflow === '6-agent' ? 3 : selectedWorkflow === '7-agent' ? 3 : 5; // Minimum expected agent contributions
+                 return agentPhases.length >= expectedAgents;
+               })() && (
                 <AnalysisResults result={currentAnalysis} />
               )}
               

@@ -5,7 +5,7 @@ import { Stock, AnalysisType, AnalysisResult } from '../types'
 interface AppState {
   selectedStock: Stock | null
   selectedAnalysisType: AnalysisType | null
-  selectedWorkflow: '7-agent' | '13-agent'
+  selectedWorkflow: '6-agent' | '7-agent' | '13-agent'
   currentAnalysis: AnalysisResult | null
   analysisHistory: AnalysisResult[]
   isAnalysisRunning: boolean
@@ -14,7 +14,7 @@ interface AppState {
   
   setSelectedStock: (stock: Stock | null) => void
   setSelectedAnalysisType: (type: AnalysisType | null) => void
-  setSelectedWorkflow: (workflow: '7-agent' | '13-agent') => void
+  setSelectedWorkflow: (workflow: '6-agent' | '7-agent' | '13-agent') => void
   setCurrentAnalysis: (analysis: AnalysisResult | null) => void
   addToHistory: (analysis: AnalysisResult) => void
   setAnalysisRunning: (running: boolean) => void
@@ -29,7 +29,7 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       selectedStock: null,
       selectedAnalysisType: null,
-      selectedWorkflow: '13-agent',
+      selectedWorkflow: '6-agent',
       currentAnalysis: null,
       analysisHistory: [],
       isAnalysisRunning: false,

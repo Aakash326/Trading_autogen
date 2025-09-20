@@ -18,7 +18,7 @@ export interface AnalysisType {
 export interface AnalysisRequest {
   stock_symbol: string;
   analysis_type: string;
-  workflow_type: '7-agent' | '13-agent';
+  workflow_type: '6-agent' | '7-agent' | '13-agent';
 }
 
 export interface AnalysisPhase {

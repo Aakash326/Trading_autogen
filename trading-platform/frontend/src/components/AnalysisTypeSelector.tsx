@@ -18,6 +18,12 @@ const ANALYSIS_TYPES: AnalysisType[] = [
     icon: '💸'
   },
   {
+    id: '1year_investment',
+    name: '📅 1-Year Investment Plan',
+    description: 'Should I invest in this stock for 1 year? Long-term investment strategy.',
+    icon: '📅'
+  },
+  {
     id: 'health',
     name: '🏥 General Health Check',
     description: 'Overall company and stock health assessment.',
@@ -64,6 +70,24 @@ const ANALYSIS_TYPES: AnalysisType[] = [
     name: '📅 Earnings Forecast',
     description: 'Upcoming earnings analysis and price impact prediction.',
     icon: '📅'
+  },
+  {
+    id: 'dividend',
+    name: '💎 Dividend Analysis',
+    description: 'Dividend yield, sustainability, and income potential.',
+    icon: '💎'
+  },
+  {
+    id: 'technical',
+    name: '📊 Technical Analysis',
+    description: 'Chart patterns, support/resistance, and technical indicators.',
+    icon: '📊'
+  },
+  {
+    id: 'momentum',
+    name: '🏃‍♂️ Momentum & Trends',
+    description: 'Price momentum, trend analysis, and momentum indicators.',
+    icon: '🏃‍♂️'
   }
 ]
 

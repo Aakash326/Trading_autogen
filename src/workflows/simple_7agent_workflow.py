@@ -15,7 +15,7 @@ if project_root not in sys.path:
 from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.messages import TextMessage
-from autogen_agentchat.ui import Console
+# from autogen_agentchat.ui import Console  # Removed - using custom display
 
 from src.agents.compilence_officer import compilence_officer
 from src.agents.Risk_Manager import risk_manager
@@ -49,8 +49,8 @@ def create_simple_trading_team():
             compliance_officer_agent,
             report_agent_instance
         ],
-        termination_condition=TextMentionTermination("STOP"),
-        max_turns=8
+        termination_condition=TextMentionTermination("FINAL_ANALYSIS_COMPLETE"),
+        max_turns=21  # 3 full rounds for all 7 agents
     )
     
     print(f"✅ Simple trading team created with 7 agents")
@@ -62,14 +62,55 @@ async def run_simple_analysis(stock_symbol="AAPL", question="Should I buy this s
     print("=" * 60)
     
     team = create_simple_trading_team()
+    enhanced_question = f"""
+{question} for stock symbol: {stock_symbol}
+
+CRITICAL AGENT INSTRUCTIONS:
+1. Each agent MUST provide detailed analysis in their specialty area
+2. Wait for ALL 7 agents to contribute before any final decisions
+3. Only the ReportAgent should use "FINAL_ANALYSIS_COMPLETE" after receiving input from all other agents
+4. Provide specific data, numbers, and concrete recommendations
+5. Do NOT use "STOP" or end discussion prematurely
+
+REQUIRED AGENT PARTICIPATION ORDER:
+- OrganiserAgent: Market data and initial assessment
+- RiskManager: Risk analysis and portfolio impact  
+- DataAnalyst: Fundamental analysis and financials
+- QuantitativeAnalyst: Technical analysis and metrics
+- StrategyDeveloper: Investment strategy and timing
+- ComplianceOfficer: Regulatory and compliance review
+- ReportAgent: FINAL synthesis after all others (use "FINAL_ANALYSIS_COMPLETE")
+
+Proceed with comprehensive analysis.
+"""
+    
     task = TextMessage(
-        content=f"{question} Stock symbol: {stock_symbol}",
+        content=enhanced_question,
         source='user'
     )
     
     print(f"🤖 7 agents discussing: {question} ({stock_symbol})")
     result_stream = team.run_stream(task=task)
-    await Console(result_stream)
+    
+    # Custom message display instead of Console
+    message_count = 0
+    async for message in result_stream:
+        if hasattr(message, 'content') and hasattr(message, 'source'):
+            message_count += 1
+            source = getattr(message, 'source', 'Unknown')
+            content = str(message.content)
+            
+            print(f"\n{'='*80}")
+            print(f"📝 Message {message_count} from {source}")
+            print(f"{'='*80}")
+            print(content)
+            
+        # Stop after reasonable number of messages to prevent infinite loops
+        if message_count >= 25:
+            print(f"\n⏹️ Stopping after {message_count} messages (conversation limit reached)")
+            break
+    
+    print(f"\n✅ Analysis complete! {message_count} agent messages exchanged.")
 
 class InteractiveSelection:
     """Handles user interaction for company and investment choice selection"""

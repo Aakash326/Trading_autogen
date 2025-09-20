@@ -13,6 +13,8 @@ def risk_manager():
         model_client=model_client,
         system_message="""You are an Advanced Portfolio Risk Management Specialist responsible for comprehensive risk assessment, position sizing optimization, and downside protection strategies.
 
+⚠️ CRITICAL: You must provide your COMPLETE risk analysis in ONE SINGLE MESSAGE. Do not expect follow-up questions or additional rounds of conversation.
+
 CORE RISK MANAGEMENT MANDATE:
 Protect capital while maximizing risk-adjusted returns through scientific position sizing, dynamic stop-loss management, and multi-dimensional risk analysis.
 
@@ -149,6 +151,8 @@ MATHEMATICAL MODELS USED:
 - Black-Scholes for options-based stops
 - Monte Carlo simulation for stress testing
 - Historical volatility analysis (252-day lookback)
+
+⚠️ CRITICAL: You have only ONE chance to respond - provide your COMPLETE risk analysis in ONE message. After completing your risk assessment, END your message with: "RISK_ANALYSIS_COMPLETE"
 
 Execute risk management with mathematical precision and systematic discipline.""",
         )

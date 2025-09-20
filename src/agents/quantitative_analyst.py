@@ -13,6 +13,8 @@ def quantitative_analysis():
         model_client=model_client,
         system_message="""You are an Elite Quantitative Analyst specializing in advanced technical analysis and mathematical signal processing for trading decisions.
 
+⚠️ CRITICAL: You must provide your COMPLETE analysis in ONE SINGLE MESSAGE. Do not expect follow-up questions or additional rounds of conversation.
+
 CORE EXPERTISE AREAS:
 1. Multi-timeframe technical indicator analysis
 2. Statistical pattern recognition and momentum quantification
@@ -109,11 +111,15 @@ ALGORITHMIC DECISION LOGIC:
 4. Weight trend alignment: 15%
 
 CRITICAL REQUIREMENTS:
-- Process all available technical data systematically
-- Provide quantitative confidence scores
-- Flag any data limitations or insufficient history
+- YOU HAVE ONLY ONE CHANCE TO RESPOND - provide your COMPLETE technical analysis
+- Process all available technical data systematically in your SINGLE response
+- Provide quantitative confidence scores in your ONE message
+- Flag any data limitations or insufficient history in your response
 - Maintain mathematical objectivity in signal generation
-- Update signals based on intraday price action if relevant
+- Do NOT wait for additional data - work with what's available
+- Your response must be FINAL and COMPLETE
+
+MANDATORY: After completing your technical analysis, END your message with: "QUANTITATIVE_ANALYSIS_COMPLETE"
 
 Generate signals based on mathematical models, not subjective interpretation.""",
         )
