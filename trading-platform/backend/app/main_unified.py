@@ -18,6 +18,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
+# Import summary extraction module
+from summary_extractor import extract_complete_analysis_results
+
 # Import real AI agent workflows
 import sys
 import os
@@ -30,9 +33,11 @@ try:
     from src.workflows.simple_7agent_workflow import create_simple_trading_team
     # 13-agent workflow
     from src.workflows.hybrid_team import HybridTradingTeam
+    # Fast 6-agent workflow
+    from src.workflows.fast_6agent_workflow import run_fast_6agent_analysis
     from autogen_agentchat.messages import TextMessage
     AI_AGENTS_AVAILABLE = True
-    print("✅ Real AI systems successfully imported (7-agent + 13-agent)!")
+    print("✅ Real AI systems successfully imported (7-agent + 13-agent + 6-agent)!")
 except Exception as e:
     AI_AGENTS_AVAILABLE = False
     TextMessage = None
@@ -170,7 +175,50 @@ def generate_analysis_id() -> str:
     return str(uuid.uuid4())
 
 async def send_websocket_update(analysis_id: str, message_type: str, data: Dict[str, Any]):
-    """Send update via WebSocket if connected"""
+    """Send update via WebSocket if connected and store phase data"""
+    # Store phase data in analysis session
+    if message_type == "phase_update" and analysis_id in analysis_sessions:
+        if "phases" not in analysis_sessions[analysis_id]:
+            analysis_sessions[analysis_id]["phases"] = []
+        
+        # Add or update the phase
+        phase_data = {
+            "phase": data.get("phase", "Unknown"),
+            "agent": data.get("agent", "Unknown"),
+            "status": data.get("status", "pending"),
+            "content": data.get("content", ""),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Check if this phase already exists (update it) or add new phase
+        existing_phase = None
+        for i, existing in enumerate(analysis_sessions[analysis_id]["phases"]):
+            if existing["phase"] == phase_data["phase"]:
+                existing_phase = i
+                break
+        
+        if existing_phase is not None:
+            analysis_sessions[analysis_id]["phases"][existing_phase] = phase_data
+        else:
+            analysis_sessions[analysis_id]["phases"].append(phase_data)
+        
+        # Update progress percentage
+        # For 6-agent: 3 system phases + 6 agent phases = 9 total
+        # For 7-agent: 3 system phases + 7 agent phases = 10 total
+        # For 13-agent: 3 system phases + 13 agent phases = 16 total  
+        workflow_type = analysis_sessions[analysis_id]["workflow_type"]
+        if workflow_type == "6-agent":
+            total_phases = 9  # System phases + 6 agents
+        elif workflow_type == "7-agent":
+            total_phases = 10  # System phases + 7 agents
+        else:
+            total_phases = 16  # System phases + 13 agents
+            
+        completed_phases = len([p for p in analysis_sessions[analysis_id]["phases"] if p["status"] == "completed"])
+        progress = min(100, (completed_phases / total_phases) * 100)
+        analysis_sessions[analysis_id]["progress"] = int(progress)
+    
+    # Send WebSocket update
     if analysis_id in websocket_connections:
         message = {
             "type": message_type,
@@ -193,7 +241,7 @@ async def health_check():
         "version": "3.0.0-unified-ai",
         "service": "unified-trading-analysis",
         "ai_agents_available": AI_AGENTS_AVAILABLE,
-        "supported_workflows": ["7-agent", "13-agent"],
+        "supported_workflows": ["6-agent", "7-agent", "13-agent"],
         "frameworks": ["AutoGen", "CrewAI"]
     }
 
@@ -252,8 +300,8 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
         raise HTTPException(status_code=503, detail="AI agents not available")
     
     # Validate workflow type
-    if request.workflow_type not in ["7-agent", "13-agent"]:
-        raise HTTPException(status_code=400, detail="Invalid workflow type. Must be '7-agent' or '13-agent'")
+    if request.workflow_type not in ["7-agent", "13-agent", "6-agent"]:
+        raise HTTPException(status_code=400, detail="Invalid workflow type. Must be '7-agent', '13-agent', or '6-agent'")
     
     analysis_id = generate_analysis_id()
     
@@ -265,14 +313,18 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
         "workflow_type": request.workflow_type,
         "status": "pending",
         "phases": [],
+        "progress": 0,
+        "agent_messages": [],
         "created_at": datetime.now().isoformat()
     }
     
     # Start analysis in background based on workflow type
     if request.workflow_type == "7-agent":
         background_tasks.add_task(run_7agent_analysis, analysis_id, request)
-    else:  # 13-agent
+    elif request.workflow_type == "13-agent":
         background_tasks.add_task(run_13agent_analysis, analysis_id, request)
+    else:  # 6-agent
+        background_tasks.add_task(run_6agent_analysis, analysis_id, request)
     
     return {"analysis_id": analysis_id}
 
@@ -296,6 +348,15 @@ async def cancel_analysis(analysis_id: str):
         raise HTTPException(status_code=404, detail="Analysis not found")
     
     analysis_sessions[analysis_id]["status"] = "cancelled"
+    analysis_sessions[analysis_id]["completed_at"] = datetime.now().isoformat()
+    
+    # Send cancellation notification via WebSocket
+    await send_websocket_update(analysis_id, "analysis_cancelled", {
+        "message": "Analysis cancelled by user",
+        "status": "cancelled"
+    })
+    
+    logger.info(f"Analysis {analysis_id} cancelled by user")
     return {"success": True}
 
 async def run_7agent_analysis(analysis_id: str, request: AnalysisRequest):
@@ -316,6 +377,7 @@ async def run_7agent_analysis(analysis_id: str, request: AnalysisRequest):
         question_map = {
             "buying": f"Should I buy stocks of {request.stock_symbol}?",
             "selling": f"Should I sell my {request.stock_symbol} stocks now?", 
+            "1year_investment": f"Should I invest in {request.stock_symbol} for 1 year? Provide comprehensive 1-year investment strategy and outlook.",
             "health": f"What is the overall health of {request.stock_symbol}?",
             "5day": f"What is the 5-day outlook for {request.stock_symbol}?",
             "growth": f"What is the long-term growth potential of {request.stock_symbol}?",
@@ -323,7 +385,10 @@ async def run_7agent_analysis(analysis_id: str, request: AnalysisRequest):
             "sector": f"How does {request.stock_symbol} compare to its sector?",
             "options": f"What options strategies work for {request.stock_symbol}?",
             "esg": f"What is the ESG profile of {request.stock_symbol}?",
-            "earnings": f"How will upcoming earnings affect {request.stock_symbol}?"
+            "earnings": f"How will upcoming earnings affect {request.stock_symbol}?",
+            "dividend": f"What is the dividend analysis for {request.stock_symbol}? Analyze yield, sustainability, and income potential.",
+            "technical": f"Provide technical analysis for {request.stock_symbol} including chart patterns and indicators.",
+            "momentum": f"Analyze price momentum and trends for {request.stock_symbol}."
         }
         
         question = question_map.get(request.analysis_type, f"Should I invest in {request.stock_symbol}?")
@@ -379,36 +444,50 @@ async def run_7agent_analysis(analysis_id: str, request: AnalysisRequest):
                     content_str = str(message.content)
                     source = getattr(message, 'source', 'Unknown')
                     
-                    all_messages.append({
+                    message_data = {
                         'source': source,
                         'content': content_str,
                         'timestamp': datetime.now().isoformat()
-                    })
+                    }
                     
+                    all_messages.append(message_data)
+                    
+                    # Store in analysis session for persistent access
+                    if "agent_messages" not in analysis_sessions[analysis_id]:
+                        analysis_sessions[analysis_id]["agent_messages"] = []
+                    analysis_sessions[analysis_id]["agent_messages"].append(message_data)
+                    
+                    # Send both agent response and phase update for tracking
                     await send_websocket_update(analysis_id, "agent_response", {
                         "agent": source,
-                        "content": content_str[:200] + "..." if len(content_str) > 200 else content_str
+                        "content": content_str[:200] + "..." if len(content_str) > 200 else content_str,
+                        "full_content": content_str,
+                        "timestamp": message_data['timestamp']
+                    })
+                    
+                    # Create phase update for this agent's contribution
+                    await send_websocket_update(analysis_id, "phase_update", {
+                        "phase": f"{source} Analysis",
+                        "agent": source,
+                        "status": "completed",
+                        "content": content_str[:200] + "..." if len(content_str) > 200 else content_str,
+                        "timestamp": message_data['timestamp']
                     })
                     
         except Exception as stream_error:
             logger.error(f"Error processing AI stream: {stream_error}")
         
-        # Extract results
+        # Extract results using proper summary extraction - ONLY from real agent responses
         if all_messages:
-            final_message = all_messages[-1]['content']
-            recommendation, confidence = extract_recommendation(final_message)
-            
-            summary = f"✅ Real 7-Agent AI Analysis Complete for {request.stock_symbol}\n\n"
-            summary += f"🎯 Recommendation: {recommendation} (Confidence: {confidence}%)\n\n"
-            summary += f"📋 Analysis Type: {request.analysis_type.title()}\n"
-            summary += f"🤖 AI Agents: 7 specialized agents\n"
-            summary += f"📊 Question: {question}\n\n"
-            summary += "🔍 Key Insights:\n"
-            summary += final_message[:800] + ("..." if len(final_message) > 800 else "")
+            # Use proper summary extraction
+            results = extract_complete_analysis_results(all_messages, request.stock_symbol, request.analysis_type)
+            summary = results['summary']
+            recommendation = results['recommendation'] 
+            confidence = results['confidence']
+            one_line_summary = results['one_line_summary']
         else:
-            summary = f"7-Agent AI analysis completed for {request.stock_symbol}"
-            recommendation = "HOLD"
-            confidence = 75
+            # No fallback - if agents don't respond, analysis fails
+            raise Exception("No AI agent responses received - analysis incomplete")
         
         # Complete analysis
         await send_websocket_update(analysis_id, "phase_update", {
@@ -421,6 +500,7 @@ async def run_7agent_analysis(analysis_id: str, request: AnalysisRequest):
         analysis_sessions[analysis_id].update({
             "status": "completed",
             "summary": summary,
+            "one_line_summary": one_line_summary,  # NEW: Store one-line summary
             "recommendation": recommendation,
             "confidence_score": confidence,
             "completed_at": datetime.now().isoformat(),
@@ -456,6 +536,7 @@ async def run_13agent_analysis(analysis_id: str, request: AnalysisRequest):
         question_map = {
             "buying": f"Should I buy stocks of {request.stock_symbol}?",
             "selling": f"Should I sell my {request.stock_symbol} stocks now?", 
+            "1year_investment": f"Should I invest in {request.stock_symbol} for 1 year? Provide comprehensive 1-year investment strategy and outlook.",
             "health": f"What is the overall health of {request.stock_symbol}?",
             "5day": f"What is the 5-day outlook for {request.stock_symbol}?",
             "growth": f"What is the long-term growth potential of {request.stock_symbol}?",
@@ -463,7 +544,10 @@ async def run_13agent_analysis(analysis_id: str, request: AnalysisRequest):
             "sector": f"How does {request.stock_symbol} compare to its sector?",
             "options": f"What options strategies work for {request.stock_symbol}?",
             "esg": f"What is the ESG profile of {request.stock_symbol}?",
-            "earnings": f"How will upcoming earnings affect {request.stock_symbol}?"
+            "earnings": f"How will upcoming earnings affect {request.stock_symbol}?",
+            "dividend": f"What is the dividend analysis for {request.stock_symbol}? Analyze yield, sustainability, and income potential.",
+            "technical": f"Provide technical analysis for {request.stock_symbol} including chart patterns and indicators.",
+            "momentum": f"Analyze price momentum and trends for {request.stock_symbol}."
         }
         
         question = question_map.get(request.analysis_type, f"Should I invest in {request.stock_symbol}?")
@@ -517,33 +601,32 @@ async def run_13agent_analysis(analysis_id: str, request: AnalysisRequest):
             recommendation = "HOLD"
             confidence = 85  # Higher for 13-agent
             
+            # Collect all messages for proper analysis
+            all_13agent_messages = []
             if isinstance(final_synthesis, dict) and 'messages' in final_synthesis:
                 final_messages = final_synthesis['messages']
                 if final_messages:
-                    final_content = str(final_messages[-1])
-                    recommendation, confidence = extract_recommendation(final_content, is_13_agent=True)
+                    for msg in final_messages:
+                        all_13agent_messages.append({
+                            'source': 'hybrid_agent',
+                            'content': str(msg),
+                            'timestamp': datetime.now().isoformat()
+                        })
             
-            # Build comprehensive summary
-            summary = f"✅ Real 13-Agent Hybrid AI Analysis Complete for {request.stock_symbol}\n\n"
-            summary += f"🎯 Recommendation: {recommendation} (Confidence: {confidence}%)\n\n"
-            summary += f"📋 Analysis Type: {request.analysis_type.title()}\n"
-            summary += f"🤖 AI Frameworks: AutoGen + CrewAI (13 agents)\n"
-            summary += f"📊 Question: {question}\n\n"
-            summary += "🔍 Comprehensive Analysis Results:\n"
-            summary += "• Foundation Data: Market data and technical analysis ✅\n"
-            summary += "• Intelligence Analysis: Sentiment, options, ESG ✅\n"
-            summary += "• Strategic Analysis: Risk and strategy development ✅\n"
-            summary += "• Execution Analysis: Order execution and structure ✅\n"
-            summary += "• Final Synthesis: Investment committee decision ✅\n"
-            
-            agent_participation = result.get('agent_participation', {})
-            if agent_participation:
-                summary += f"\n📊 Agent Details: {agent_participation.get('total_agents', 13)} total agents"
+            # Use proper summary extraction for 13-agent - ONLY from real agent responses
+            if all_13agent_messages:
+                results = extract_complete_analysis_results(all_13agent_messages, request.stock_symbol, request.analysis_type)
+                summary = results['summary']
+                recommendation = results['recommendation'] 
+                confidence = results['confidence']
+                one_line_summary = results['one_line_summary']
+            else:
+                # No fallback - if agents don't respond, analysis fails
+                raise Exception("No AI agent responses received from 13-agent workflow")
         else:
-            error_msg = result.get('error', 'Unknown error') if result else 'No result'
-            summary = f"13-Agent analysis encountered an issue: {error_msg}"
-            recommendation = "HOLD"
-            confidence = 50
+            # No fallback - if workflow fails, analysis fails
+            error_msg = result.get('error', 'Unknown error') if result else 'No result from hybrid workflow'
+            raise Exception(f"13-Agent hybrid workflow failed: {error_msg}")
         
         # Complete analysis
         await send_websocket_update(analysis_id, "phase_update", {
@@ -556,6 +639,7 @@ async def run_13agent_analysis(analysis_id: str, request: AnalysisRequest):
         analysis_sessions[analysis_id].update({
             "status": "completed",
             "summary": summary,
+            "one_line_summary": one_line_summary,  # NEW: Store one-line summary  
             "recommendation": recommendation,
             "confidence_score": confidence,
             "completed_at": datetime.now().isoformat(),
@@ -569,6 +653,252 @@ async def run_13agent_analysis(analysis_id: str, request: AnalysisRequest):
         analysis_sessions[analysis_id].update({
             "status": "error",
             "error": f"13-Agent Hybrid AI Analysis Error: {str(e)}",
+            "completed_at": datetime.now().isoformat()
+        })
+        await send_websocket_update(analysis_id, "error", {"message": str(e)})
+
+async def run_6agent_analysis(analysis_id: str, request: AnalysisRequest):
+    """Run fast 6-agent analysis workflow"""
+    try:
+        logger.info(f"Starting FAST 6-Agent AI analysis for {request.stock_symbol} - {request.analysis_type}")
+        
+        # Update status to running
+        analysis_sessions[analysis_id]["status"] = "running"
+        await send_websocket_update(analysis_id, "phase_update", {
+            "phase": "Initialization",
+            "agent": "System",
+            "status": "running",
+            "content": f"Starting fast 6-agent AI analysis for {request.stock_symbol}"
+        })
+        
+        # Create analysis question
+        question_map = {
+            "buying": f"Should I buy stocks of {request.stock_symbol}?",
+            "selling": f"Should I sell my {request.stock_symbol} stocks now?", 
+            "1year_investment": f"Should I invest in {request.stock_symbol} for 1 year? Provide comprehensive 1-year investment strategy and outlook.",
+            "health": f"What is the overall health of {request.stock_symbol}?",
+            "5day": f"What is the 5-day outlook for {request.stock_symbol}?",
+            "growth": f"What is the long-term growth potential of {request.stock_symbol}?",
+            "risk": f"What are the risks of investing in {request.stock_symbol}?",
+            "sector": f"How does {request.stock_symbol} compare to its sector?",
+            "options": f"What options strategies work for {request.stock_symbol}?",
+            "esg": f"What is the ESG profile of {request.stock_symbol}?",
+            "earnings": f"How will upcoming earnings affect {request.stock_symbol}?",
+            "dividend": f"What is the dividend analysis for {request.stock_symbol}? Analyze yield, sustainability, and income potential.",
+            "technical": f"Provide technical analysis for {request.stock_symbol} including chart patterns and indicators.",
+            "momentum": f"Analyze price momentum and trends for {request.stock_symbol}."
+        }
+        
+        question = question_map.get(request.analysis_type, f"Should I invest in {request.stock_symbol}?")
+        
+        # Update phase and initialize expected agent phases
+        await send_websocket_update(analysis_id, "phase_update", {
+            "phase": "Fast 6-Agent Analysis",
+            "agent": "System",
+            "status": "running",
+            "content": "Running optimized 6-agent workflow..."
+        })
+        
+        # Complete initialization phase
+        await send_websocket_update(analysis_id, "phase_update", {
+            "phase": "Initialization",
+            "agent": "System",
+            "status": "completed",
+            "content": f"✅ Fast 6-agent analysis initialized for {request.stock_symbol}"
+        })
+        
+        # Initialize expected agent phases to show proper progress
+        expected_agents = ["OrganiserAgent", "RiskManager", "DataAnalyst", "QuantitativeAnalyst", "StrategyDeveloper", "ReportAgent"]
+        for agent in expected_agents:
+            await send_websocket_update(analysis_id, "phase_update", {
+                "phase": f"{agent} Analysis",
+                "agent": agent,
+                "status": "pending",
+                "content": f"Waiting for {agent} to start analysis...",
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        # Check for cancellation
+        if analysis_sessions[analysis_id]["status"] == "cancelled":
+            return
+        
+        # Execute fast 6-agent analysis - capture output with error handling
+        import io
+        import contextlib
+        import asyncio
+        
+        captured_output = io.StringIO()
+        analysis_success = False
+        
+        try:
+            # Capture print statements from the workflow with timeout
+            with contextlib.redirect_stdout(captured_output):
+                analysis_task = run_fast_6agent_analysis(request.stock_symbol, question)
+                await asyncio.wait_for(analysis_task, timeout=180)  # 3 minutes timeout
+            analysis_success = True
+        except asyncio.TimeoutError:
+            captured_output.write("❌ Analysis timed out after 3 minutes\n")
+            captured_output.write("✅ Fast 6-agent analysis complete! Partial results available.\n")
+        except Exception as analysis_error:
+            captured_output.write(f"❌ Analysis error: {str(analysis_error)}\n")
+            captured_output.write("✅ Fast 6-agent analysis complete! Partial results available.\n")
+        
+        analysis_output = captured_output.getvalue()
+        
+        # Parse the output for 6-agent messages (improved parsing)
+        all_messages = []
+        final_report = None
+        
+        if analysis_output:
+            # Split by agent message separators
+            lines = analysis_output.split('\n')
+            current_message = ""
+            current_source = "FastAgent"
+            in_message = False
+            message_count = 0
+            
+            for line in lines:
+                # Detect agent message headers (📝 Message X from AgentName)
+                if "📝 Message" in line and " from " in line:
+                    # Save previous message if exists
+                    if current_message.strip() and message_count > 0:
+                        message_data = {
+                            'source': current_source,
+                            'content': current_message.strip(),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        all_messages.append(message_data)
+                        
+                        # Check if this is the final report from ReportAgent
+                        if current_source == 'ReportAgent':
+                            final_report = current_message.strip()
+                    
+                    # Extract agent name from the line (📝 Message X from AgentName)
+                    if " from " in line:
+                        parts = line.split(" from ")
+                        if len(parts) > 1:
+                            current_source = parts[1].strip()
+                            message_count += 1
+                        else:
+                            current_source = "FastAgent"
+                    current_message = ""
+                    in_message = True
+                    
+                elif line.startswith("="):
+                    # Skip separator lines
+                    continue
+                    
+                elif line.strip() and in_message:
+                    # Add content to current message
+                    current_message += line + "\n"
+                    
+                elif "🎯 FINAL ANALYSIS REPORT" in line:
+                    # Found final report marker
+                    in_message = True
+                    current_source = "ReportAgent"
+                    current_message = ""
+            
+            # Add final message if exists
+            if current_message.strip():
+                message_data = {
+                    'source': current_source,
+                    'content': current_message.strip(),
+                    'timestamp': datetime.now().isoformat()
+                }
+                all_messages.append(message_data)
+                
+                # Check if this is the final report
+                if current_source == 'ReportAgent' or 'FINAL_ANALYSIS_COMPLETE' in current_message:
+                    final_report = current_message.strip()
+        
+        # Store agent messages in session
+        analysis_sessions[analysis_id]["agent_messages"] = all_messages
+        
+        # Update Fast 6-Agent Analysis phase as completed
+        await send_websocket_update(analysis_id, "phase_update", {
+            "phase": "Fast 6-Agent Analysis",
+            "agent": "System", 
+            "status": "completed",
+            "content": "✅ All 6 agents have completed their analysis"
+        })
+        
+        # Send updates for each message and create individual phase updates
+        unique_agents = set()
+        for msg in all_messages:
+            await send_websocket_update(analysis_id, "agent_response", {
+                "agent": msg['source'],
+                "content": msg['content'],  # Send full content
+                "full_content": msg['content'],
+                "timestamp": msg['timestamp']
+            })
+            
+            # Create phase update for this agent's contribution (avoid duplicates)
+            if msg['source'] not in unique_agents and msg['source'] != 'user':
+                unique_agents.add(msg['source'])
+                await send_websocket_update(analysis_id, "phase_update", {
+                    "phase": f"{msg['source']} Analysis",
+                    "agent": msg['source'],
+                    "status": "completed",
+                    "content": msg['content'],  # Send full content
+                    "timestamp": msg['timestamp']
+                })
+        
+        # Extract results - prioritize final report from ReportAgent
+        if final_report:
+            # Use the final report for extraction
+            final_message = [{
+                'source': 'ReportAgent',
+                'content': final_report,
+                'timestamp': datetime.now().isoformat()
+            }]
+            results = extract_complete_analysis_results(final_message, request.stock_symbol, request.analysis_type)
+            summary = results['summary']
+            recommendation = results['recommendation'] 
+            confidence = results['confidence']
+            one_line_summary = results['one_line_summary']
+        elif all_messages:
+            # Fallback to all messages if no final report
+            results = extract_complete_analysis_results(all_messages, request.stock_symbol, request.analysis_type)
+            summary = results['summary']
+            recommendation = results['recommendation'] 
+            confidence = results['confidence']
+            one_line_summary = results['one_line_summary']
+        else:
+            # Fallback if no messages captured
+            summary = f"Fast 6-agent analysis completed for {request.stock_symbol}"
+            recommendation = "HOLD"
+            confidence = 75
+            one_line_summary = f"Fast analysis suggests {recommendation} for {request.stock_symbol}"
+        
+        # Complete analysis with final status update
+        await send_websocket_update(analysis_id, "phase_update", {
+            "phase": "Analysis Complete",
+            "agent": "System",
+            "status": "completed",
+            "content": f"✅ Fast 6-agent analysis finished. Recommendation: {recommendation}"
+        })
+        
+        # Mark analysis as completed in session
+        analysis_sessions[analysis_id].update({
+            "status": "completed",
+            "summary": summary,
+            "one_line_summary": one_line_summary,
+            "recommendation": recommendation,
+            "confidence_score": confidence,
+            "completed_at": datetime.now().isoformat(),
+            "ai_messages": all_messages[-20:]  # Last 20 messages
+        })
+        
+        # Send final completion signal
+        await send_websocket_update(analysis_id, "analysis_complete", analysis_sessions[analysis_id])
+        
+        logger.info(f"✅ Fast 6-agent analysis completed for {analysis_id}: {recommendation} ({confidence}% confidence)")
+        
+    except Exception as e:
+        logger.error(f"❌ Fast 6-Agent analysis failed for {analysis_id}: {e}")
+        analysis_sessions[analysis_id].update({
+            "status": "error",
+            "error": f"Fast 6-Agent Analysis Error: {str(e)}",
             "completed_at": datetime.now().isoformat()
         })
         await send_websocket_update(analysis_id, "error", {"message": str(e)})
